@@ -25,10 +25,9 @@ namespace ConsoleApp1
             Console.WriteLine("Would you like to view all salespeople? [y / n]");
 
             var input = Console.ReadLine();
-            if (input.StartsWith("y", StringComparison.
-            OrdinalIgnoreCase))
+            if (input.StartsWith("y", StringComparison.OrdinalIgnoreCase))
             {
-                ShowAllSalesPeople();
+                ShowAllSalesPeopleUsingProjection();
             }
         }
         private static void ShowAllSalesPeople()
@@ -46,6 +45,29 @@ namespace ConsoleApp1
 
                     Console.WriteLine($"{sp} | {sp.BusinessEntity.BusinessEntity.LastName}" + $", {sp.BusinessEntity.BusinessEntity.FirstName}");
 
+                }
+            }
+        }
+
+        private static void ShowAllSalesPeopleUsingProjection()
+        {
+            using (var db = new AdventureWorksContext(_optionsBuilder.Options))
+            {
+                var salesPeople = db.SalesPeople
+                    .Select(x => new
+                    {
+                        x.BusinessEntityId,
+                        x.BusinessEntity.BusinessEntity.FirstName,
+                        x.BusinessEntity.BusinessEntity.LastName,
+                        x.SalesQuota,
+                        x.SalesYtd,
+                        x.SalesLastYear
+                    }).ToList();
+
+                foreach (var sp in salesPeople)
+                {
+                    Console.WriteLine($"BID: {sp.BusinessEntityId} | Name: {sp.LastName}" + $", {sp.FirstName} | Quota: {sp.SalesQuota} | " +
+                    $"YTD Sales: {sp.SalesYtd} | SalesLastYear {sp.SalesLastYear}");
                 }
             }
         }
