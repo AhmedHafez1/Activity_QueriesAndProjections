@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using System;
 using System.Linq;
+using EF_Activity001.DTOs;
 
 namespace ConsoleApp1
 {
@@ -22,14 +23,47 @@ namespace ConsoleApp1
         static void Main(string[] args)
         {
             BuildOptions();
-            Console.WriteLine("Would you like to view all salespeople? [y / n]");
 
-            var input = Console.ReadLine();
+            var input = string.Empty;
+            Console.WriteLine("Would you like to view the sales report?");
+            input = Console.ReadLine();
             if (input.StartsWith("y", StringComparison.OrdinalIgnoreCase))
             {
-                ShowAllSalesPeopleUsingProjection();
+                //GenerateSalesReport();
+                GenerateSalesReportToDTO();
             }
         }
+
+        private static void GenerateSalesReportToDTO()
+        {
+            decimal filter = GetFilterFromUser();
+
+            using (var db = new AdventureWorksContext(_optionsBuilder.Options))
+            {
+                var salesReportDetails = db.SalesPeople.Select(sp => new SalesReportListingDto
+                {
+                    BusinessEntityId = sp.BusinessEntityId,
+                    FirstName = sp.BusinessEntity.BusinessEntity.FirstName,
+                    LastName = sp.BusinessEntity.BusinessEntity.LastName,
+                    SalesYtd = sp.SalesYtd,
+                    Territories = sp.SalesTerritoryHistories
+                        .Select(y => y.Territory.Name),
+                    TotalOrders = sp.SalesOrderHeaders.Count(),
+                    TotalProductsSold = sp.SalesOrderHeaders
+                        .SelectMany(y => y.SalesOrderDetails)
+                        .Sum(z => z.OrderQty)
+                }).Where(srds => srds.SalesYtd > filter)
+                .OrderBy(srds => srds.LastName)
+                .ThenBy(srds => srds.FirstName)
+                .ThenByDescending(srds => srds.SalesYtd);
+
+                foreach (var srd in salesReportDetails)
+                {
+                    Console.WriteLine(srd);
+                }
+            }
+        }
+
         private static void ShowAllSalesPeople()
         {
             using (var db = new AdventureWorksContext(_optionsBuilder.
@@ -70,6 +104,53 @@ namespace ConsoleApp1
                     $"YTD Sales: {sp.SalesYtd} | SalesLastYear {sp.SalesLastYear}");
                 }
             }
+        }
+
+        static void GenerateSalesReport()
+        {
+            decimal filter = GetFilterFromUser();
+
+            using (var db = new AdventureWorksContext(_optionsBuilder.Options))
+            {
+                var salesReportDetails = db.SalesPeople.Select(sp => new
+                {
+                    beid = sp.BusinessEntityId,
+                    sp.BusinessEntity.BusinessEntity.FirstName,
+                    sp.BusinessEntity.BusinessEntity.LastName,
+                    sp.SalesYtd,
+                    Territories = sp.SalesTerritoryHistories
+                        .Select(y => y.Territory.Name),
+                    OrderCount = sp.SalesOrderHeaders.Count(),
+                    TotalProductsSold = sp.SalesOrderHeaders
+                        .SelectMany(y => y.SalesOrderDetails)
+                        .Sum(z => z.OrderQty)
+                }).Where(srds => srds.SalesYtd > filter)
+                .OrderBy(srds => srds.LastName)
+                .ThenBy(srds => srds.FirstName)
+                .ThenByDescending(srds => srds.SalesYtd)
+                .Take(20)
+                .ToList();
+
+                foreach (var srd in salesReportDetails)
+                {
+                    Console.WriteLine($"{srd.beid}| {srd.LastName}, {srd.FirstName}" + $"| YTD Sales: {srd.SalesYtd}" +
+                    $"| {string.Join(',', srd.Territories)}" + $"| Order Count: {srd.OrderCount}" +
+                    $"| Products Sold: {srd.TotalProductsSold}");
+                }
+            }
+        }
+
+        private static decimal GetFilterFromUser()
+        {
+            Console.WriteLine("What is the minimum amount of sales?");
+            var input = Console.ReadLine();
+            decimal filter = 0.0m;
+            if (!decimal.TryParse(input, out filter))
+            {
+                Console.WriteLine("Bad input");
+                return 0.0m;
+            }
+            return filter;
         }
     }
 }
